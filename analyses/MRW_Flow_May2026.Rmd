@@ -1,0 +1,62 @@
+---
+title: "MRW_Flow_May2026"
+output: html_document
+date: "2026-06-04"
+author: "Colin G. Finlay"
+---
+
+# Setup
+
+```{r Setup}
+# Clear environment
+rm(list=ls())
+
+#use to set working directory 
+knitr::opts_knit$set(root.dir="~/GitHub/FlowThrough_CoastalAg/analyses")
+```
+
+```{r Load packages}
+require("tidyverse")
+```
+
+```{r Load data}
+Flow_waterCols <- read.csv("../data/Hyde/MRW/MRW_FlowRates_LineIDs.csv")
+```
+
+
+# Smallest and largest water column in Salt treatment
+
+```{r}
+# Largest water column
+Flow_waterCols |>
+  dplyr::filter(Tank == "salt") |>
+  dplyr::slice_max(Average_height_cm, n = 1) |>
+  dplyr::select(Core_ID, Tank, Average_height_cm) # 18_salt, 12.425 cm
+
+# Smallest water column
+Flow_waterCols |>
+  dplyr::filter(Tank == "salt") |>
+  dplyr::slice_min(Average_height_cm, n = 1) |>
+  dplyr::select(Core_ID, Tank, Average_height_cm) # 24_salt, 8.9 cm
+```
+
+# Average flow rate per core
+
+```{r}
+# Calculate average flow per Core and place in new df
+flow_avg <- Flow_waterCols |>
+  dplyr::group_by(Core_ID) |>
+  dplyr::summarise(avg_Flow_rate_L_hr = mean(Flow_rate_L_hr, na.rm = TRUE))
+
+# Remove malformed row
+flow_avg <- flow_avg |> dplyr::filter(Core_ID != "")
+
+# Write out csv
+write.csv(flow_avg, "../csv_out/MRW_flow_avg.csv", row.names = FALSE)
+```
+
+
+
+
+
+
