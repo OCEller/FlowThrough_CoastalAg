@@ -1,0 +1,732 @@
+##MIMS Flow
+What you need:
+- MIMS Data .xlsx
+- Flow Rates .xlsx
+
+What you need to change ( * ):
+- Hamme Solubility
+  - Calculator
+    - Insert
+*      - Change Temperature and Salinity Values for stds, first set, and second,
+set of calculations. 
+
+- MIMS Data
+*  - Insert MIMS Data .xlsx
+*  - Change Sheet name and data range (if needed)
+
+- MIMS Calculations
+*  - Row data ranges (ex. 56:91)
+
+- MIMS First Set of Samples (Fresh, etc.)
+*  - Row data ranges (ex. 1:45)
+*  - Optional sections of code at the bottom
+
+- MIMS Second Set of Samples (Salt, etc.)
+*  - Row data ranges (ex. 72:107)
+*  - Optional sections of code at the bottom
+
+- Flux Calculations
+  - Flow Rates
+*    - Insert Flow Rates .xlsx
+*    - Change Sheet name and data range (if needed)
+*      - Change data ranges (ex. 1:24, 26:49)
+      
+- First Set of Flux Calculations (Fresh, etc.)
+*  - Change data ranges (ex. 34:36, 1:36 )
+*  - Change Area value
+
+- Second Set of Flux Calculations (Salt, etc.)
+*  - Change data ranges (ex. 34:36, 37:72)
+*  - Change Area value
+
+
+Notes:
+- May need to change "sample" to "sample ID" (or vise versa) depending on your
+MIMS Data
+- May need to change "Time" to "time run" (or vise versa) depending on your 
+MIMS Data
+
+##Housekeeping
+
+```{r setup, include=FALSE}
+rm(list=ls())
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE)
+#use to set working directory 
+knitr::opts_knit$set(root.dir="~/GitHub/FlowThrough_CoastalAg/MIMS_calculations/")
+```
+
+```{r load packages}
+library(readxl)
+```
+
+##Hamme Solubility -----
+
+##Table of Coefficients
+```{r}
+coef_table <- data.frame(
+  Coefficient = c("A0", "A1", "A2", "A3", "A4", "A5",
+                  "B0", "B1", "B2", "B3", "C0", "XcSTD"),
+  
+  N2 = c(6.42931, 2.92704, 4.32531, 4.69149,
+         NA, NA,
+         -0.00744129, -0.00802566, -0.0146775,
+         NA, NA,
+         22.404),
+ Ar = c(2.7915, 3.17609, 4.13116, 4.90379,
+         NA, NA,
+         -0.00696233, -0.0076667, -0.0116888,
+         NA, NA,
+         22.393),
+  
+  Ne = c(2.18156, 1.29108, 2.12504, 0,
+         NA, NA,
+         -0.00594737, -0.00513896, 0,
+         NA, NA,
+         22.425),
+  
+  O2 = c(5.8087100, 3.2029100, 4.1788700, 5.1000600,
+         -0.0986643, 3.8036900,
+         -0.00701577, -0.00770028, -0.0113864,
+         -0.00951519, -0.000000275915,
+         NA))
+
+```
+
+
+## Calculator
+```{r}
+calc_sample <- function(temp, sal) {
+  ##Ts, Ts2, Ts3 (Ts4, Ts5 (not shown)) Calculation 
+  Ts <- log((298.15 - temp) / (273.15 + temp))
+  Ts2 <- Ts^2
+  Ts3 <- Ts^3
+  Ts4 <- Ts3 * Ts
+  Ts5 <- Ts3 * Ts2
+ 
+  ##[N2] Calculation
+  A0 <- coef_table$N2[coef_table$Coefficient == "A0"]
+  A1 <- coef_table$N2[coef_table$Coefficient == "A1"]
+  A2 <- coef_table$N2[coef_table$Coefficient == "A2"]
+  A3 <- coef_table$N2[coef_table$Coefficient == "A3"]
+  
+  B0 <- coef_table$N2[coef_table$Coefficient == "B0"]
+  B1 <- coef_table$N2[coef_table$Coefficient == "B1"]
+  B2 <- coef_table$N2[coef_table$Coefficient == "B2"]
+  
+  ln_N2 <-
+    A0 + (A1 * Ts) + (A2 * Ts2) + (A3 * Ts3) + 
+    (sal * (B0 + (B1 * Ts) + (B2 * Ts2)))
+  
+  N2 <- exp(ln_N2)
+  
+  ##28N2 Calculation
+  N2_28 <- N2 * 0.99634 * 0.99634
+  
+  ##29N2 Calculation
+  N2_29 <- N2 * 0.0072932
+  
+  ##[Ar] Calculation
+  A0 <- coef_table$Ar[coef_table$Coefficient == "A0"]
+  A1 <- coef_table$Ar[coef_table$Coefficient == "A1"]
+  A2 <- coef_table$Ar[coef_table$Coefficient == "A2"]
+  A3 <- coef_table$Ar[coef_table$Coefficient == "A3"]
+
+  B0 <- coef_table$Ar[coef_table$Coefficient == "B0"]
+  B1 <- coef_table$Ar[coef_table$Coefficient == "B1"]
+  B2 <- coef_table$Ar[coef_table$Coefficient == "B2"]
+  
+  ln_Ar <- 
+    (A0 + A1*Ts + A2*Ts2 + A3*Ts3 + sal*(B0 + B1*Ts + B2*Ts2))
+  
+  Ar <- exp(ln_Ar)
+    
+  ##40Ar Calculation
+  Ar_40 <- Ar * 0.996
+  
+  ##28N2/40Ar Calculation
+  ratio_N2_Ar <- N2_28 / Ar_40
+  
+  ##29N2/40Ar
+  ratio_29_Ar <- N2_29 / Ar_40
+  
+  ## [Ne] Calculation
+  A0 <- coef_table$Ne[coef_table$Coefficient == "A0"]
+  A1 <- coef_table$Ne[coef_table$Coefficient == "A1"]
+  A2 <- coef_table$Ne[coef_table$Coefficient == "A2"]
+  A3 <- coef_table$Ne[coef_table$Coefficient == "A3"]
+  
+  B0 <- coef_table$Ne[coef_table$Coefficient == "B0"]
+  B1 <- coef_table$Ne[coef_table$Coefficient == "B1"]
+  B2 <- coef_table$Ne[coef_table$Coefficient == "B2"]
+  
+  ln_Ne <-
+    (A0 + (A1 * Ts) + (A2 * Ts2) + (A3 * Ts3) + (sal * 
+          (B0 + (B1 * Ts) + (B2 * Ts2))))
+  
+  Ne <- exp(ln_Ne)
+  
+  ##[O2] Calculation
+  A0 <- coef_table$O2[coef_table$Coefficient == "A0"]
+  A1 <- coef_table$O2[coef_table$Coefficient == "A1"]
+  A2 <- coef_table$O2[coef_table$Coefficient == "A2"]
+  A3 <- coef_table$O2[coef_table$Coefficient == "A3"]
+  A4 <- coef_table$O2[coef_table$Coefficient == "A4"]
+  A5 <- coef_table$O2[coef_table$Coefficient == "A5"]
+  
+  B0 <- coef_table$O2[coef_table$Coefficient == "B0"]
+  B1 <- coef_table$O2[coef_table$Coefficient == "B1"]
+  B2 <- coef_table$O2[coef_table$Coefficient == "B2"]
+  B3 <- coef_table$O2[coef_table$Coefficient == "B3"]
+  C0 <- coef_table$O2[coef_table$Coefficient == "C0"]
+  
+  ln_O2 <-
+    A0 + A1 * Ts + A2 * Ts2 + A3 * Ts3 + A4 * Ts4 + A5 * Ts5 + 
+    sal * (B0 + B1 * Ts + B2 * Ts2 + B3 * Ts3 + C0 * Ts2)
+  
+  O2 <- exp(ln_O2)
+  
+  ##32O2 Calculation
+  O2_32 <- O2 * 0.99759 * 0.99759
+  
+  ##32O2/40Ar Calculation
+  ratio_O232_Ar <- O2_32 / Ar_40
+  
+  data.frame(
+    TEMP = temp,
+    SALINITY = sal,
+    Ts = Ts,
+    Ts2 = Ts2,
+    Ts3 = Ts3,
+    N2 = N2,
+    N2_28 = N2_28,
+    N2_29 = N2_29,
+    Ar = Ar,
+    Ar_40 = Ar_40,
+    N2_28_to_Ar_40 = ratio_N2_Ar,
+    N2_29_to_Ar_40 = ratio_29_Ar,
+    Ne = Ne,
+    O2 = O2,
+  O2_32 = O2_32,
+  O2_32_to_Ar_40 = ratio_O232_Ar)
+}
+
+##For umoles and nmoles/liter -----
+calc_umoles <- function(temp, sal) {
+  
+  ##Calling
+    sample <- calc_sample(temp, sal)
+    N2 <- sample$N2
+    N2_28 <- sample$N2_28
+    N2_29 <- sample$N2_29
+    Ar <- sample$Ar
+    Ar_40 <- sample$Ar_40
+    Ne <- sample$Ne
+    O2 <- sample$O2
+    O2_32 <- sample$O2_32
+    ratio_O232_Ar <- sample$ratio_O232_Ar
+    ratio_N2_Ar <- sample$ratio_N2_Ar
+    ratio_29_Ar <- sample$ratio_29_Ar
+    
+    
+  
+  ##For density calculations
+  DCA <- 0.824493 - 0.0040899 * temp + 0.000076438 * (temp^2) - 0.00000082467 * (temp^3) + 0.0000000053875 * (temp^4)
+  DCB <- -0.00572466 + 0.00010227 * temp - 0.0000016546 * (temp^2)
+  DCC <- 0.00048314
+  
+  
+  ##po and p calculations
+  po <- 999.842594 + (0.06793952) * (temp)  - ( 0.00909529) * (temp^2) +
+  (0.0001001685) * (temp^3) - (0.000001120083) * (temp^4) + (0.000000006536336) * (temp^5)
+  
+  p <- po + (DCA*sal)+((DCB*sal)^3/2) + DCC*sal
+  
+  p_kg_l <- p / 1000
+  
+  ## N2 Calculations
+  
+  uM_N2 <- N2 * p_kg_l
+  
+  uM_N2_28 <- N2_28 * p_kg_l
+  
+  uM_N2_29 <- N2_29 * p_kg_l
+  
+  ##Ar Calculations
+  
+  uM_Ar <- Ar * p_kg_l
+  
+  uM_40_Ar <- Ar_40 * p_kg_l
+  
+  ##ratios
+  uM_ratio_N2_Ar <- uM_N2_28 / uM_40_Ar
+  
+  uM_ratio_29_Ar <- uM_N2_29 / uM_40_Ar
+  
+  ##Ne Calculations
+  
+  uM_Ne <- Ne * p_kg_l
+  
+  ##O2 Calculations
+  
+  uM_O2 <- O2 * p_kg_l
+  
+  uM_O2_32 <- O2_32 * p_kg_l
+  
+  uM_ratio_O232_Ar <- uM_O2_32 / uM_40_Ar
+  
+  
+  data.frame(
+    TEMP = temp,
+    SALINITY = sal,
+    po = po,
+    p = p,
+    p_kg_l = p_kg_l,
+    uM_N2 = uM_N2,
+    uM_N2_28 = uM_N2_28,
+    uM_N2_29 = uM_N2_29,
+    uM_Ar = uM_Ar,
+    uM_40_Ar = uM_40_Ar,
+    uM_N2_28_to_Ar_40 = uM_ratio_N2_Ar,
+    uM_N2_29_to_Ar_40 = uM_ratio_29_Ar,
+    uM_Ne = uM_Ne,
+    uM_O2 = uM_O2,
+    uM_O2_32 = uM_O2_32,
+    uM_O2_32_to_Ar_40 = uM_ratio_O232_Ar
+    
+  )
+
+}
+
+##Insert (sample temp, sample sal) -----
+gas_ratios_stds <- calc_sample(14, 0)# <- Not used in calculations
+uM_nM_stds <- calc_umoles(14,0) # <-- For stds calculations
+uM_nM_fresh <- calc_umoles(14,20) # <-- For first set of data 
+uM_nM_salt <- calc_umoles(14,21.16) # <- For second set of data (may not be needed)
+
+#If any renamed, don't forget to replace all df names in future calculations
+```
+
+##MIMS Data -----
+```{r}
+# Colin comment: add any input data files to "../data/"
+  # MRW: "../data/Hyde/MRW/"
+  # YHR (June flow): "../data/Pitt/YHR/"
+# Colin comment: read_excel is new to me. If it works well we can stick with it. If it's clunky, we can easily switch to .csv input data and read.csv
+
+MIMS_Data <- read_excel("~/Downloads/ECU/Research/Peralta_Lab/Coding_Project/data/20260521_Finlay_MIMS_72Samples_ARScheck (copy).xlsx",
+                        
+                  sheet = "Data",
+                   range = "A8:L115") # <- Adjust accordingly
+
+#Depending on the name, you may need to adjust "sample" to "sample"
+
+```
+
+##MIMS Calculations -----
+```{r}
+##MIMS Drift -----
+#Row numbers should be your stds rows
+MIMS_Data$`N2:Ar` <- as.numeric(MIMS_Data$`N2:Ar`)
+MIMS_Data$`time run` <- as.numeric(MIMS_Data$`time run`)
+MIMS_Data$`O2:Ar` <- as.numeric(MIMS_Data$`O2:Ar`)
+MIMS_Data$`40` <- as.numeric(MIMS_Data$`40`)
+
+MIMS_Drift_df <- data.frame(
+  metric = c("Slope", "Intercept"),
+
+  N2_Ar = c(
+    coef(lm(`N2:Ar` ~ `time run`, data = MIMS_Data[1:33, ]))[2],
+    coef(lm(`N2:Ar` ~ `time run`, data = MIMS_Data[1:33, ]))[1]
+  ),
+
+  O2_Ar = c(
+    coef(lm(`O2:Ar` ~ `time run`, data = MIMS_Data[1:33, ]))[2],
+    coef(lm(`O2:Ar` ~ `time run`, data = MIMS_Data[1:33, ]))[1]
+  ),
+  
+  Ar = c(
+    coef(lm(`40` ~ `time run`, data = MIMS_Data[1:33, ]))[2],
+    coef(lm(`40` ~ `time run`, data = MIMS_Data[1:33, ]))[1]
+  )
+)
+## STDS Calculations -----
+
+#N2:Ar stnd
+slope_N2 <- MIMS_Drift_df$N2_Ar[MIMS_Drift_df$metric == "Slope"]
+intercept_N2 <- MIMS_Drift_df$N2_Ar[MIMS_Drift_df$metric == "Intercept"]
+
+#O2:Ar stnd
+slope_O2 <- MIMS_Drift_df$O2_Ar[MIMS_Drift_df$metric == "Slope"]
+intercept_O2 <- MIMS_Drift_df$O2_Ar[MIMS_Drift_df$metric == "Intercept"]
+
+#[uM N2]:[uM Ar] (Stds Water Bath Equilibrium)
+uM_N2_uM_Ar_value <- uM_nM_stds$`uM_N2_28_to_Ar_40`
+
+#Ar stnd
+slope_Ar <- MIMS_Drift_df$Ar[MIMS_Drift_df$metric == "Slope"]
+intercept_Ar <- MIMS_Drift_df$Ar[MIMS_Drift_df$metric == "Intercept"]
+
+#[uM O2]:[uM Ar] (water bath equilibrium)
+uM_O2_uM_Ar_value <- uM_nM_stds$`uM_O2_32_to_Ar_40`
+
+#[uM N2]:[uM Ar] (sample)
+x <- MIMS_Data$`time run`[1:33]
+
+N2_Ar_stnd = slope_N2 * x + intercept_N2
+  
+uM_N2_uM_Ar_sample_value <-
+  (MIMS_Data$`N2:Ar`[1:33] * uM_N2_uM_Ar_value) /
+  N2_Ar_stnd
+
+#[uM O2]:[uM Ar] (sample)
+O2_Ar_stnd = slope_O2 * x + intercept_O2
+
+uM_O2_uM_Ar_sample_value <-
+  (MIMS_Data$`O2:Ar`[1:33] * uM_O2_uM_Ar_value) /
+  O2_Ar_stnd
+
+#uM Ar (exp equilibrium)
+uM_Ar_exp_value <- uM_nM_stds$`uM_40_Ar`
+
+#uM N
+uM_N_value <- (uM_N2_uM_Ar_sample_value * uM_Ar_exp_value) * 2
+
+#uM O2
+uM_O2_value <- (uM_O2_uM_Ar_sample_value * uM_Ar_exp_value)
+
+#mg/L O2
+mg_L_O2_value <- (uM_O2_value * 32) / 1000
+
+#uM Ar
+Ar_stnd <- slope_Ar * x + intercept_Ar
+
+uM_Ar_value <- (MIMS_Data$`40`[1:33]) * (uM_Ar_exp_value / Ar_stnd)
+
+#2STDEV_uMN
+STDEV_2_uMN_value = 2 * (sd(uM_N_value))
+
+#2STDEV_uMO2
+STDEV_2_uMO2_value = 2 * (sd(uM_O2_value))
+
+#2STDEV_uMAr
+STDEV_2_uMAr_value = 2 * (sd(uM_Ar_value))
+
+
+MIMS_stds_Calc <- data.frame(
+  sample = "stds",
+  N2_Ar_stnd = slope_N2 * x + intercept_N2,
+  O2_Ar_stnd = slope_O2 * x + intercept_O2,
+  uM_N2_uM_Ar = uM_N2_uM_Ar_value,
+  Ar_stnd = slope_Ar * x + intercept_Ar,
+  uM_O2_uM_Ar = uM_O2_uM_Ar_value,
+  uM_N2_uM_Ar_sample = uM_N2_uM_Ar_sample_value,
+  uM_O2_uM_Ar_sample = uM_O2_uM_Ar_sample_value,
+  uM_Ar_exp = uM_Ar_exp_value,
+  uM_N = uM_N_value,
+  uM_O2 = uM_O2_value,
+  mg_L_O2 = mg_L_O2_value,
+  uM_Ar = uM_Ar_value,
+  STDEV_2_uMN = STDEV_2_uMN_value,
+  STDEV_2_uMO2 = STDEV_2_uMO2_value,
+  STDEV_2_uMAr = STDEV_2_uMAr_value
+
+)
+```
+
+##MIMS First Set of Samples (Fresh, etc.)
+```{r}
+## First Set of Samples Calculations
+
+#N2:Ar stnd
+slope_N2 <- MIMS_Drift_df$N2_Ar[MIMS_Drift_df$metric == "Slope"]
+intercept_N2 <- MIMS_Drift_df$N2_Ar[MIMS_Drift_df$metric == "Intercept"]
+
+#O2:Ar stnd
+slope_O2 <- MIMS_Drift_df$O2_Ar[MIMS_Drift_df$metric == "Slope"]
+intercept_O2 <- MIMS_Drift_df$O2_Ar[MIMS_Drift_df$metric == "Intercept"]
+
+#[uM N2]:[uM Ar] (Stds Water Bath Equilibrium)
+uM_N2_uM_Ar_value <- uM_nM_stds$`uM_N2_28_to_Ar_40`
+
+#Ar stnd
+slope_Ar <- MIMS_Drift_df$Ar[MIMS_Drift_df$metric == "Slope"]
+intercept_Ar <- MIMS_Drift_df$Ar[MIMS_Drift_df$metric == "Intercept"]
+
+#[uM O2]:[uM Ar] (water bath equilibrium)
+uM_O2_uM_Ar_value <- uM_nM_stds$`uM_O2_32_to_Ar_40`
+
+#[uM N2]:[uM Ar] (sample)
+x <- MIMS_Data$`time run`[36:71]
+
+N2_Ar_stnd = slope_N2 * x + intercept_N2
+  
+uM_N2_uM_Ar_sample_value <-
+  (MIMS_Data$`N2:Ar`[36:71] * uM_N2_uM_Ar_value) /
+  N2_Ar_stnd
+
+#[uM O2]:[uM Ar] (sample)
+O2_Ar_stnd = slope_O2 * x + intercept_O2
+
+uM_O2_uM_Ar_sample_value <-
+  (MIMS_Data$`O2:Ar`[36:71] * uM_O2_uM_Ar_value) /
+  O2_Ar_stnd
+
+#uM Ar (exp equilibrium)
+uM_Ar_exp_value <- uM_nM_fresh$`uM_40_Ar`
+
+#uM N
+uM_N_value <- (uM_N2_uM_Ar_sample_value * uM_Ar_exp_value) * 2
+
+#uM O2
+uM_O2_value <- (uM_O2_uM_Ar_sample_value * uM_Ar_exp_value)
+
+#mg/L O2
+mg_L_O2_value <- (uM_O2_value * 32) / 1000
+
+#uM Ar
+Ar_stnd <- slope_Ar * x + intercept_Ar
+
+uM_Ar_value <- (MIMS_Data$`40`[36:71]) * (uM_Ar_exp_value / Ar_stnd)
+
+
+#Dataframe (adjust name as needed)
+MIMS_fresh_Calc <- data.frame(
+  `sample` = MIMS_Data$`sample`[36:71],
+  N2_Ar_stnd = slope_N2 * x + intercept_N2,
+  O2_Ar_stnd = slope_O2 * x + intercept_O2,
+  Ar_stnd = slope_Ar * x + intercept_Ar,
+  uM_N2_uM_Ar_stds = uM_N2_uM_Ar_value,
+  uM_O2_uM_Ar_stds = uM_O2_uM_Ar_value,
+  uM_N2_uM_Ar_sample = uM_N2_uM_Ar_sample_value,
+  uM_O2_uM_Ar_sample = uM_O2_uM_Ar_sample_value,
+  uM_Ar_exp = uM_Ar_exp_value,
+  uM_N = uM_N_value,
+  uM_O2 = uM_O2_value,
+  mg_L_O2 = mg_L_O2_value,
+  uM_Ar = uM_Ar_value
+)
+
+MIMS_fresh_BP <- MIMS_fresh_Calc[c(34, 35, 36), ] # <-- Creating a seperate df for BP rows to make future calculations easier (change to match dataset)
+
+# MIMS_fresh_BP <- MIMS_fresh_BP[-c(1, 4), ] # <-- ONLY IF you need to remove some BP rows
+
+MIMS_fresh_Calc <- MIMS_fresh_Calc[-c(34, 35, 36), ] # <-- To remove BP rows
+```
+
+## MIMS Second Set of Samples (Salt, etc.)
+```{r}
+## Second Set of Samples Calculations
+# You may not need to run this chunk of code if you only are using one set of data that does not differ 
+
+#N2:Ar stnd
+slope_N2 <- MIMS_Drift_df$N2_Ar[MIMS_Drift_df$metric == "Slope"]
+intercept_N2 <- MIMS_Drift_df$N2_Ar[MIMS_Drift_df$metric == "Intercept"]
+
+#O2:Ar stnd
+slope_O2 <- MIMS_Drift_df$O2_Ar[MIMS_Drift_df$metric == "Slope"]
+intercept_O2 <- MIMS_Drift_df$O2_Ar[MIMS_Drift_df$metric == "Intercept"]
+
+#[uM N2]:[uM Ar] (Stds Water Bath Equilibrium)
+uM_N2_uM_Ar_value <- uM_nM_stds$`uM_N2_28_to_Ar_40`
+
+#Ar stnd
+slope_Ar <- MIMS_Drift_df$Ar[MIMS_Drift_df$metric == "Slope"]
+intercept_Ar <- MIMS_Drift_df$Ar[MIMS_Drift_df$metric == "Intercept"]
+
+#[uM O2]:[uM Ar] (water bath equilibrium)
+uM_O2_uM_Ar_value <- uM_nM_stds$`uM_O2_32_to_Ar_40`
+
+#[uM N2]:[uM Ar] (sample)
+x <- MIMS_Data$`time run`[72:107]
+
+N2_Ar_stnd = slope_N2 * x + intercept_N2
+  
+uM_N2_uM_Ar_sample_value <-
+  (MIMS_Data$`N2:Ar`[72:107] * uM_N2_uM_Ar_value) /
+  N2_Ar_stnd
+
+#[uM O2]:[uM Ar] (sample)
+O2_Ar_stnd = slope_O2 * x + intercept_O2
+
+uM_O2_uM_Ar_sample_value <-
+  (MIMS_Data$`O2:Ar`[72:107] * uM_O2_uM_Ar_value) /
+  O2_Ar_stnd
+
+#uM Ar (exp equilibrium)
+uM_Ar_exp_value <- uM_nM_salt$`uM_40_Ar`
+
+#uM N
+uM_N_value <- (uM_N2_uM_Ar_sample_value * uM_Ar_exp_value) * 2
+
+#uM O2
+uM_O2_value <- (uM_O2_uM_Ar_sample_value * uM_Ar_exp_value)
+
+#mg/L O2
+mg_L_O2_value <- (uM_O2_value * 32) / 1000
+
+#uM Ar
+Ar_stnd <- slope_Ar * x + intercept_Ar
+
+uM_Ar_value <- (MIMS_Data$`40`[72:107]) * (uM_Ar_exp_value / Ar_stnd)
+
+
+#Dataframe (adjust name as needed)
+MIMS_salt_Calc <- data.frame(
+  `sample` = MIMS_Data$`sample`[72:107],
+  N2_Ar_stnd = slope_N2 * x + intercept_N2,
+  O2_Ar_stnd = slope_O2 * x + intercept_O2,
+  Ar_stnd = slope_Ar * x + intercept_Ar,
+  uM_N2_uM_Ar_stds = uM_N2_uM_Ar_value,
+  uM_O2_uM_Ar_stds = uM_O2_uM_Ar_value,
+  uM_N2_uM_Ar_sample = uM_N2_uM_Ar_sample_value,
+  uM_O2_uM_Ar_sample = uM_O2_uM_Ar_sample_value,
+  uM_Ar_exp = uM_Ar_exp_value,
+  uM_N = uM_N_value,
+  uM_O2 = uM_O2_value,
+  mg_L_O2 = mg_L_O2_value,
+  uM_Ar = uM_Ar_value
+)
+
+MIMS_salt_BP <- MIMS_salt_Calc[c(1, 2, 3), ] # <-- Creating a separate df for BP rows to make future calculations easier (change to match dataset)
+
+### MIMS_salt_BP <- MIMS_salt_BP[-c(1, 4), ] # <-- ONLY IF you need to remove some BP rows
+
+MIMS_salt_Calc <- MIMS_salt_Calc[-c(1, 2, 3), ] # <-- To remove BP rows
+
+```
+
+##Flux Calculations
+You only need to run one Flow Rate code chunk. Flow Rate (Averaged) is if you need to average the flow rates for the core samples. Flow Rate (Individual) is if you already have all of the flow rates for each core and can input them.
+
+```{r} 
+#Flow Rate (Averaged) -----
+Flow_Rates <- read_excel("~/Downloads/ECU/Research/Peralta_Lab/Coding_Project/data/Copy_of_MRW_FlowRates_LineIDs.xlsx",
+           sheet = "June17",
+           range ="A1:U50")
+Flow_Rates$Flow_rate_L_hr <- as.numeric(Flow_Rates$Flow_rate_L_hr)
+
+#Flow Rate Averages
+flow_rate_value <-(
+Flow_Rates$Flow_rate_L_hr[1:24] +
+ Flow_Rates$Flow_rate_L_hr[26:49]) / 2
+
+flow_rate_expanded <- rep(flow_rate_value, each =3) # <-- Replicate so we can align the flow rate averages with the samples (one average rate per three core samples)
+
+
+Flow_Rates_df <- data.frame (
+Core_ID = MIMS_Data$sample[36:107], #<- This if you need to add samples to the dataframe if the imported dataset doesnt already contain them.
+Flow_rate_L_hr = flow_rate_expanded
+)
+
+Flow_Rates_df <- Flow_Rates_df[-c(34, 35, 36, 37, 38, 39), ] # <-- This is to exclude the BP rows to make future calculations easier
+
+```
+
+```{r}
+#Flow Rate (Individual) -----
+Flow_Rates <- read_excel("~/Downloads/ECU/Research/Peralta_Lab/Coding_Project/data/FlowRates_LineIDs.xlsx",
+           sheet = "June11",
+           range ="A1:T39")
+
+Flow_Rates$Flow_rate_L_hr <- as.numeric(Flow_Rates$Flow_rate_L_hr)
+
+Flow_Rates_df <- data.frame (
+### Core_ID = MIMS_Data$sample[36:107], #<- This if you need to add samples to the dataframe if the imported data set doesn't already contain them.
+Flow_rate_L_hr = Flow_Rates$Flow_rate_L_hr)
+
+Flow_Rates_df <- Flow_Rates_df[-c(4, 12, 17, 25, 30, 38), ] # <-- This is to exclude the BP rows to make future calculations easier
+
+
+```
+
+
+```{r}
+## First Set of Flux Calculations (Fresh, etc) -----
+
+# Note: Row numbers should represent either all of the data or a portion of it (such as the Fresh water portion)
+
+##CV Calculations
+CV_N2_Ar_value <- (sd(MIMS_fresh_BP$`uM_N2_uM_Ar_sample`)) / mean(MIMS_fresh_BP$`uM_N2_uM_Ar_sample`)
+
+CV_O2_Ar_value <- (sd(MIMS_fresh_BP$`uM_O2_uM_Ar_sample`)) / mean(MIMS_fresh_BP$`uM_O2_uM_Ar_sample`)
+
+CV_Ar_value <- (sd(MIMS_fresh_BP$`uM_Ar`)) / mean(MIMS_fresh_BP$`uM_Ar`)
+
+Area_m2_value = 0.00311724531052447 # <-- Change Area Value if needed
+
+##Fluxes
+N2_flux_value <- ((MIMS_fresh_Calc$`uM_N`) - (mean(MIMS_fresh_BP$`uM_N`))) * (Flow_Rates_df$Flow_rate_L_hr[1:33] / Area_m2_value)
+
+O2_flux_value <- ((MIMS_fresh_Calc$`uM_O2`) - (mean(MIMS_fresh_BP$`uM_O2`))) * (Flow_Rates_df$Flow_rate_L_hr[1:33] / Area_m2_value)
+
+Ar_flux_value <- ((MIMS_fresh_Calc$`uM_Ar`) - (mean(MIMS_fresh_BP$`uM_Ar`))) * (Flow_Rates_df$Flow_rate_L_hr[1:33] / Area_m2_value)
+
+Flux_Fresh <- data.frame(
+  sample = Flow_Rates_df$`Core_ID`[1:33],
+  CV_N2_Ar = paste0(round(CV_N2_Ar_value * 100, 2), "%"),
+  CV_O2_Ar = paste0(round(CV_O2_Ar_value * 100, 2), "%"),
+  CV_Ar = paste0(round(CV_Ar_value * 100, 2), "%"),
+  N2_flux_umol_N_m2_hr_1 = N2_flux_value,
+  O2_flux_umol_N_m2_hr_1 = O2_flux_value,
+  Ar_flux_umol_N_m2_hr_1 = Ar_flux_value,
+  Flow_L_hr_1 = Flow_Rates_df$Flow_rate_L_hr [1:33],
+  Area_m2 = Area_m2_value
+)
+
+```
+
+```{r}
+## Second Set of Flux Calculations (Salt, etc) -----
+# Note: Row numbers should represent either all of the data or a portion of it (such as the Salt water portion)
+
+##CV Calculations
+CV_N2_Ar_value <- (sd(MIMS_salt_BP$`uM_N2_uM_Ar_sample`)) / mean(MIMS_salt_BP$`uM_N2_uM_Ar_sample`)
+
+CV_O2_Ar_value <- (sd(MIMS_salt_BP$`uM_O2_uM_Ar_sample`)) / mean(MIMS_salt_BP$`uM_O2_uM_Ar_sample`)
+
+CV_Ar_value <- (sd(MIMS_salt_BP$`uM_Ar`)) / mean(MIMS_salt_BP$`uM_Ar`)
+
+Area_m2_value = 0.00311724531052447 # <-- Change Area Value
+
+##Flux Calculations
+N2_flux_value <- ((MIMS_salt_Calc$`uM_N`) - (mean(MIMS_salt_BP$`uM_N`))) * (Flow_Rates_df$Flow_rate_L_hr[34:66] / Area_m2_value)
+
+O2_flux_value <- ((MIMS_salt_Calc$`uM_O2`) - (mean(MIMS_salt_BP$`uM_O2`))) * (Flow_Rates_df$Flow_rate_L_hr[34:66] / Area_m2_value)
+
+Ar_flux_value <- ((MIMS_salt_Calc$`uM_Ar`) - (mean(MIMS_salt_BP$`uM_Ar`))) * (Flow_Rates_df$Flow_rate_L_hr[34:66] / Area_m2_value)
+
+Flux_Salt <- data.frame(
+ sample = Flow_Rates_df$`Core_ID`[34:66],
+  CV_N2_Ar = paste0(round(CV_N2_Ar_value * 100, 2), "%"),
+  CV_O2_Ar = paste0(round(CV_O2_Ar_value * 100, 2), "%"),
+  CV_Ar = paste0(round(CV_Ar_value * 100, 2), "%"),
+  N2_flux_umol_N_m2_hr_1 = N2_flux_value,
+  O2_flux_umol_N_m2_hr_1 = O2_flux_value,
+  Ar_flux_umol_N_m2_hr_1 = Ar_flux_value,
+  Flow_L_hr_1 = Flow_Rates_df$Flow_rate_L_hr[34:66],
+  Area_m2 = Area_m2_value
+)
+```
+
+## What You Probably Want to See
+```{r}
+#MIMS Calculations
+View(MIMS_fresh_Calc)
+View(MIMS_salt_Calc)
+
+#Flux Calculations
+View(Flux_Fresh)
+View(Flux_Salt)
+
+#Honorable Mentions
+View(umoles_nmoles_liter)
+View(Flow_Rate_df)
+```
+
+# Next steps: verification
+
+```{r}
+# basically, we'll want to compare the outputs of our Excel vs. R workflow. I'm picturing a fancy coding method to compare the values and say they are equal (with YHR and MRW datasets)
+```
+
+
