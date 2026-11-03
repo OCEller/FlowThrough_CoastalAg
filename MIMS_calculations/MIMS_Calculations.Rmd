@@ -330,18 +330,9 @@ uM_nM_salt <- calc_umoles(14,21.16) # <- For second set of data (may not be need
 
 ##MIMS Data -----
 ```{r}
-# Colin comment: add any input data files to "../data/"
+# Add any input data files to "../data/"
   # MRW: "../data/Hyde/MRW/"
   # YHR (June flow): "../data/Pitt/YHR/"
-# Colin comment: read_excel is new to me. If it works well we can stick with it. If it's clunky, we can easily switch to .csv input data and read.csv
-
-# Previous
-#MIMS_Data <- read_excel("~/Downloads/ECU/Research/Peralta_Lab/Coding_Project/data/20260521_Finlay_MIMS_72Samples_ARScheck (copy).xlsx",
-                        
-                  #sheet = "Data",
-                   #range = "A8:L115") # <- Adjust accordingly
-
-## New relative path looks great, should we just delete the `Previous` file path? - O'Conall
 
 # Updated, date file in repo, relative path
 MIMS_Data <- read_excel("../data/Hyde/MRW/20260521_Finlay_MIMS_72Samples_ARScheck.xlsx",
@@ -537,7 +528,7 @@ MIMS_fresh_Calc <- data.frame(
   uM_Ar = uM_Ar_value
 )
 
-MIMS_fresh_BP <- MIMS_fresh_Calc[c(34, 35, 36), ] # <-- Creating a seperate df for BP rows to make future calculations easier (change to match dataset)
+MIMS_fresh_BP <- MIMS_fresh_Calc[c(34, 35, 36), ] # <-- Creating a separate df for BP rows to make future calculations easier (change to match dataset)
 
 # MIMS_fresh_BP <- MIMS_fresh_BP[-c(1, 4), ] # <-- ONLY IF you need to remove some BP rows
 
@@ -631,18 +622,12 @@ You only need to run one Flow Rate code chunk. Flow Rate (Averaged) is if you ne
 
 ```{r} 
 #Flow Rate (Averaged) -----
-# Old file path
-#Flow_Rates <- read_excel("~/Downloads/ECU/Research/Peralta_Lab/Coding_Project/data/Copy_of_MRW_FlowRates_LineIDs.xlsx",
-          # sheet = "June17",
-          # range ="A1:U50")
 
-## New file path looks great, should we just delete the `Old file path? - O'Conall
 
 # Updated file path
 Flow_Rates <- read_excel("../data/Hyde/MRW/MRW_FlowRates_LineIDs.xlsx",
            #sheet = "AprMay2026",
            range ="AprMay2026!A1:U50")
-# NOT LOADING CORRECT SHEET. MAYBE MY FORMATTING ON SHEET AFTER VERSION WAS SHARED. CAN O'CONALL SUPPLY VERSION OF SHEET HE IS USING?
 
 Flow_Rates$Flow_rate_L_hr <- as.numeric(Flow_Rates$Flow_rate_L_hr)
 
@@ -664,20 +649,18 @@ Flow_Rates_df <- Flow_Rates_df[-c(34, 35, 36, 37, 38, 39), ] # <-- This is to ex
 ```
 
 ```{r}
+# Using averaged flow rates for the MRW data set
+
 #Flow Rate (Individual) -----
-Flow_Rates <- read_excel("~/Downloads/ECU/Research/Peralta_Lab/Coding_Project/data/FlowRates_LineIDs.xlsx", # O'CONALL, PLEASE ADD YOUR VERSION OF THIS FILE TO THE REPO AS WELL."
-           sheet = "June11",
-           range ="A1:T39")
+# (read in Flow_Rates if not read in already)
 
-Flow_Rates$Flow_rate_L_hr <- as.numeric(Flow_Rates$Flow_rate_L_hr)
+#Flow_Rates$Flow_rate_L_hr <- as.numeric(Flow_Rates$Flow_rate_L_hr)
 
-Flow_Rates_df <- data.frame (
+#Flow_Rates_df <- data.frame (
 ### Core_ID = MIMS_Data$sample[36:107], #<- This if you need to add samples to the dataframe if the imported data set doesn't already contain them.
-Flow_rate_L_hr = Flow_Rates$Flow_rate_L_hr)
+#Flow_rate_L_hr = Flow_Rates$Flow_rate_L_hr)
 
-Flow_Rates_df <- Flow_Rates_df[-c(4, 12, 17, 25, 30, 38), ] # <-- This is to exclude the BP rows to make future calculations easier
-
-
+#Flow_Rates_df <- Flow_Rates_df[-c(4, 12, 17, 25, 30, 38), ] # <-- This is to exclude the BP rows to make future calculations easier
 ```
 
 
@@ -868,8 +851,15 @@ return(validation)
 #Inputs
 validate_flux(
   flux_df = Flux_Fresh,
-  excel_file = "~/Downloads/ECU/Research/Peralta_Lab/Coding_Project/data/ReOrg_Fluxes_4 - Copy.xlsx",
-  sheet_name = "May5_Fresh",
+  excel_file = "../data/Hyde/MRW/MRW_ReOrg_Fluxes.xlsx",
+  sheet_name = "Fresh",
+  data_range = "X1:AE48" #CV, Flux, Flow, and Area data
+)
+
+validate_flux(
+  flux_df = Flux_Salt,
+  excel_file = "../data/Hyde/MRW/MRW_ReOrg_Fluxes.xlsx",
+  sheet_name = "Salt",
   data_range = "X1:AE48" #CV, Flux, Flow, and Area data
 )
 
